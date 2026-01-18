@@ -1,0 +1,8 @@
+{
+  "name": "图解学习",
+  "description": "An AI-powered educational app that turns real-world objects into interactive lessons using computer vision and generative AI.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
