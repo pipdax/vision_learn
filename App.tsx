@@ -17,7 +17,9 @@ import {
   Minimize2,
   Trash2,
   Layers,
-  X
+  X,
+  Plus,
+  Check
 } from 'lucide-react';
 import CameraCanvas from './components/CameraCanvas';
 import SettingsModal from './components/SettingsModal';
@@ -42,6 +44,8 @@ const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isContentFullscreen, setIsContentFullscreen] = useState(false);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [isAddingTopic, setIsAddingTopic] = useState(false);
+  const [newTopicValue, setNewTopicValue] = useState('');
   
   // Workspace / Displayed States
   const [topics, setTopics] = useState<string[]>([]);
@@ -173,6 +177,21 @@ const App: React.FC = () => {
     setSelectedTopics(prev => prev.filter(t => t !== topicToDelete));
   };
 
+  const handleAddManualTopic = () => {
+    const trimmed = newTopicValue.trim();
+    if (trimmed && !topics.includes(trimmed)) {
+      setTopics(prev => {
+        const next = [...prev, trimmed];
+        setWorkspace(w => ({ ...w, topics: next }));
+        return next;
+      });
+      setNewTopicValue('');
+      setIsAddingTopic(false);
+    } else if (topics.includes(trimmed)) {
+      alert("该知识点已存在");
+    }
+  };
+
   const handleGenerateLesson = async () => {
     if (selectedTopics.length === 0) return;
 
@@ -284,10 +303,10 @@ const App: React.FC = () => {
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
                       isDeleteMode ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
-                    title="删除知识点"
+                    title="管理知识点列表"
                   >
                     <Trash2 size={14} />
-                    {isDeleteMode ? '完成删除' : '管理列表'}
+                    {isDeleteMode ? '完成管理' : '管理列表'}
                   </button>
                 </div>
                 <div className="flex gap-2 pl-1">
@@ -308,34 +327,74 @@ const App: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {topics.length === 0 ? (
-                <p className="text-slate-400 text-sm italic">
-                  {isProcessing ? "正在分析图像内容..." : "拍照并标注感兴趣的部分，点击拆解获取知识点"}
-                </p>
-              ) : (
-                topics.map(topic => (
-                  <div key={topic} className="relative group/pill">
+            <div className="flex flex-wrap gap-2 items-center">
+              {topics.map(topic => (
+                <div key={topic} className="relative group/pill">
+                  <button
+                    onClick={() => toggleTopic(topic)}
+                    className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                      selectedTopics.includes(topic)
+                        ? 'bg-blue-600 text-white shadow-md shadow-blue-200 scale-105'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    } ${isDeleteMode ? 'pr-8 cursor-default' : ''}`}
+                  >
+                    {topic}
+                  </button>
+                  {isDeleteMode && (
                     <button
-                      onClick={() => toggleTopic(topic)}
-                      className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                        selectedTopics.includes(topic)
-                          ? 'bg-blue-600 text-white shadow-md shadow-blue-200 scale-105'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      } ${isDeleteMode ? 'pr-8 cursor-default' : ''}`}
+                      onClick={() => deleteTopic(topic)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 bg-red-400 text-white rounded-full hover:bg-red-600 transition-colors"
                     >
-                      {topic}
+                      <X size={12} />
                     </button>
-                    {isDeleteMode && (
-                      <button
-                        onClick={() => deleteTopic(topic)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 bg-red-400 text-white rounded-full hover:bg-red-600 transition-colors"
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
-                ))
+                  )}
+                </div>
+              ))}
+              
+              {isAddingTopic ? (
+                <div className="flex items-center gap-1 bg-white border border-blue-200 rounded-full pl-3 pr-1 py-0.5 shadow-sm animate-in fade-in slide-in-from-left-2 duration-200">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newTopicValue}
+                    onChange={(e) => setNewTopicValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddManualTopic()}
+                    placeholder="输入知识点..."
+                    className="bg-transparent border-none outline-none text-sm text-slate-700 w-32"
+                  />
+                  <button 
+                    onClick={handleAddManualTopic}
+                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
+                  >
+                    <Check size={14} />
+                  </button>
+                  <button 
+                    onClick={() => { setIsAddingTopic(false); setNewTopicValue(''); }}
+                    className="p-1 text-slate-400 hover:bg-slate-50 rounded-full transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsAddingTopic(true)}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-slate-400 border border-dashed border-slate-300 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all"
+                  title="手动添加知识点"
+                >
+                  <Plus size={14} />
+                  添加
+                </button>
+              )}
+
+              {topics.length === 0 && !isAddingTopic && !isProcessing && (
+                <p className="text-slate-400 text-sm italic ml-2">
+                  拍照并标注感兴趣的部分，或手动添加知识点
+                </p>
+              )}
+              {isProcessing && topics.length === 0 && (
+                <p className="text-slate-400 text-sm italic ml-2 animate-pulse">
+                  正在分析图像内容...
+                </p>
               )}
             </div>
           </div>
@@ -372,7 +431,7 @@ const App: React.FC = () => {
                 <div className="p-8 bg-white rounded-full shadow-sm border border-slate-100">
                     <BookOpen size={48} className="opacity-20" />
                 </div>
-                <p className="text-sm">选择左侧捕获的知识点，AI 将为你生成互动式可视化教学课件</p>
+                <p className="text-sm">选择核心知识点，AI 将为你生成互动式可视化教学课件</p>
               </div>
             )}
           </div>
