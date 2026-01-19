@@ -26,7 +26,7 @@ export class GeminiService {
 1. **模式判定**：
    - 优先识别标注：如果图片中有红框、圈选或线条等标注，请精确分析标注区域。
    - 全局扫描：若无标注，请分析全图。
-2. **原子化拆解**：提取出的知识点不要总结成宏大的概论或大块的知识包。请轻微分解 these 概念，确保每个知识点都是“原子级”的、独立的专业学术概念，以便于后续针对性学习。
+2. **原子化拆解**：提取出的知识点不要总结成宏大的概论或大块的知识包。请轻微分解这些概念，确保每个知识点都是“原子级”的、独立的专业学术概念，以便于后续针对性学习。
 3. **理性表达**：必须使用标准的、理性的学术术语。严禁使用形象化或幼儿化的表述（例如：使用“光合作用”而非“植物吃阳光”）。
 4. **学科归属**：识别结果应具有明确的学科边界。
 
@@ -87,13 +87,15 @@ export class GeminiService {
     }
   }
 
-  async generateLesson(topics: string[], age: number, type: LessonType): Promise<string> {
+  async generateLesson(topics: string[], age: number, type: LessonType, extraRequirements?: string): Promise<string> {
+    const userInstruction = extraRequirements ? `\n**用户的额外个性化要求（请务必最高优先级满足）：**\n${extraRequirements}\n` : "";
+
     if (type === LessonType.IMAGE) {
       const response = await this.ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: {
           parts: [{
-            text: `作为一名科学插画家，请为 ${age} 岁的孩子创作一张关于 "${topics.join(', ')}" 的极其生动形象的教学插图。要求：采用绝妙的比喻（如将电流比作奔跑的小鹿），风格温暖、细节丰富且高清，一眼就能激发孩子的探索欲。`
+            text: `作为一名科学插画家，请为 ${age} 岁的孩子创作一张关于 "${topics.join(', ')}" 的极其生动形象的教学插图。要求：采用绝妙的比喻（如将电流比作奔跑的小鹿），风格温暖、细节丰富且高清，一眼就能激发孩子的探索欲。${userInstruction}`
           }]
         },
         config: {
@@ -134,9 +136,9 @@ export class GeminiService {
       modeSpecific = `作为一名世界顶级的金牌科普作家和排版设计师，请创作一篇“图解式科普专题”。
         要求：
         1. **文字叙事为主**：文字功底极深，逻辑如丝般顺滑。从孩子能触碰的生活常识切入，用绝妙的比喻（Metaphor）将知识点串联成一条完整的认知链路。
-        2. **形象化点缀**：在纯文字讲述的过程中，偶尔利用 CSS 形状或简单的 inline SVG 绘制形象化的解释图（例如：用一个带动画的圆圈代表原子，或用简单的线条箭头展示力的方向），辅助文字理解。
+        2. **形象化点缀**：在纯文字讲述的过程中，偶尔利用 CSS 形状或简单的 inline SVG 绘制形象化的解释图，辅助文字理解。
         3. **极佳版式**：采用大字号、宽行距，优美的页边距设计。重要结论使用带有柔和背景色的“金句框”标注。
-        4. **由浅入深**：严格遵循认知规律，先建立感性认识，再逐步推导理性原理。内容分段明确，加入适量的 Emoji 提升亲和力。`;
+        4. **由浅入深**：严格遵循认知规律，先建立感性认识，再逐步推导理性原理。内容分段明确。`;
     }
 
     const response = await this.ai.models.generateContent({
@@ -151,6 +153,7 @@ export class GeminiService {
 4. **分步式/模块化结构**：如果内容涉及多个层面，请务必在页面内设计“展示模块切换”或“滚动叙事”，确保每个知识块都能被透彻讲解，不要全部堆叠在一起。
 5. **技术实现**：
    - ${modeSpecific}
+   ${userInstruction}
    - 代码必须包含在单一 HTML 结构中，包含所有 CSS 和 JS；
    - 页面背景要柔和，阅读体验要极致；
    - 只输出代码，严禁输出任何 Markdown 标记。`,

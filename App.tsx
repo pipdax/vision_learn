@@ -20,7 +20,8 @@ import {
   X,
   Plus,
   Check,
-  AlignLeft
+  AlignLeft,
+  Pencil
 } from 'lucide-react';
 import CameraCanvas from './components/CameraCanvas';
 import SettingsModal from './components/SettingsModal';
@@ -47,6 +48,7 @@ const App: React.FC = () => {
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [isAddingTopic, setIsAddingTopic] = useState(false);
   const [newTopicValue, setNewTopicValue] = useState('');
+  const [extraRequirement, setExtraRequirement] = useState('');
   
   // Workspace / Displayed States
   const [topics, setTopics] = useState<string[]>([]);
@@ -198,7 +200,7 @@ const App: React.FC = () => {
 
     setIsProcessing(true);
     try {
-      const html = await gemini.generateLesson(selectedTopics, settings.age, lessonType);
+      const html = await gemini.generateLesson(selectedTopics, settings.age, lessonType, extraRequirement);
       setCurrentHtml(html);
       setWorkspace(prev => ({ ...prev, currentHtml: html }));
 
@@ -440,40 +442,56 @@ const App: React.FC = () => {
           </div>
 
           <div className="p-6 border-t border-slate-100 flex flex-col gap-4 items-center bg-white flex-shrink-0">
-             <div className="flex p-1 bg-slate-100 rounded-xl w-full max-w-lg">
-                {[
-                  { id: LessonType.IMAGE, icon: <Palette size={16} />, label: "形象绘图" },
-                  { id: LessonType.TEXT, icon: <AlignLeft size={16} />, label: "文字讲解" },
-                  { id: LessonType.HTML, icon: <FileCode size={16} />, label: "视觉图解" },
-                  { id: LessonType.SVG, icon: <Activity size={16} />, label: "交互动画" }
-                ].map((type) => (
-                  <button
-                    key={type.id}
-                    onClick={() => setLessonType(type.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
-                      lessonType === type.id 
-                      ? 'bg-white text-blue-600 shadow-sm' 
-                      : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    {type.icon}
-                    {type.label}
-                  </button>
-                ))}
-             </div>
+             <div className="w-full max-w-lg space-y-4">
+               {/* Extra Requirements Input */}
+               <div className="relative group">
+                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors pointer-events-none">
+                   <Pencil size={14} />
+                 </div>
+                 <input
+                   type="text"
+                   value={extraRequirement}
+                   onChange={(e) => setExtraRequirement(e.target.value)}
+                   placeholder="额外要求（如：多用动物做比喻、加入小测试...）"
+                   className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-slate-400"
+                 />
+               </div>
 
-             <button
-                onClick={handleGenerateLesson}
-                disabled={selectedTopics.length === 0 || isProcessing}
-                className="group relative flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-10 py-3.5 rounded-full font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-xl active:scale-95 w-full max-w-sm justify-center"
-             >
-                {isProcessing ? (
-                   <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
-                ) : (
-                   <PlayCircle size={22} className="group-hover:text-blue-400" />
-                )}
-                开始生成讲解
-             </button>
+               <div className="flex p-1 bg-slate-100 rounded-xl w-full">
+                  {[
+                    { id: LessonType.IMAGE, icon: <Palette size={16} />, label: "形象绘图" },
+                    { id: LessonType.TEXT, icon: <AlignLeft size={16} />, label: "文字讲解" },
+                    { id: LessonType.HTML, icon: <FileCode size={16} />, label: "视觉图解" },
+                    { id: LessonType.SVG, icon: <Activity size={16} />, label: "交互动画" }
+                  ].map((type) => (
+                    <button
+                      key={type.id}
+                      onClick={() => setLessonType(type.id)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
+                        lessonType === type.id 
+                        ? 'bg-white text-blue-600 shadow-sm' 
+                        : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      {type.icon}
+                      {type.label}
+                    </button>
+                  ))}
+               </div>
+
+               <button
+                  onClick={handleGenerateLesson}
+                  disabled={selectedTopics.length === 0 || isProcessing}
+                  className="group relative flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-10 py-3.5 rounded-full font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-xl active:scale-95 w-full justify-center"
+               >
+                  {isProcessing ? (
+                     <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                  ) : (
+                     <PlayCircle size={22} className="group-hover:text-blue-400" />
+                  )}
+                  开始生成讲解
+               </button>
+             </div>
           </div>
         </div>
       </main>
