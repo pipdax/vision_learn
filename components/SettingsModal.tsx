@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { X, Settings, User } from 'lucide-react';
+import { X, Settings, User, Zap, Sparkles } from 'lucide-react';
 import { UserSettings } from '../types';
 
 interface SettingsModalProps {
@@ -39,9 +39,26 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ settings, onSave, onClose
             <p className="text-xs text-slate-400">AI 将根据年龄调整讲解的难度与风格</p>
           </div>
 
+          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+                <Sparkles size={16} className="text-purple-500" />
+                开启 Pro 模式
+              </div>
+              <p className="text-[10px] text-slate-400">解锁 4K 高清手绘图及更强大的生成能力</p>
+            </div>
+            <button
+              onClick={() => setLocalSettings({ ...localSettings, isProMode: !localSettings.isProMode })}
+              className={`relative w-12 h-6 rounded-full transition-all duration-300 focus:outline-none ${localSettings.isProMode ? 'bg-indigo-600' : 'bg-slate-300'}`}
+            >
+              <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-300 ${localSettings.isProMode ? 'translate-x-6' : 'translate-x-0'}`} />
+            </button>
+          </div>
+
           <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-            <p className="text-xs text-blue-700 leading-relaxed">
-              API 配置已由系统自动管理。应用将根据您的年龄设置生成个性化教学内容。
+            <p className="text-xs text-blue-700 leading-relaxed flex items-center gap-2">
+              <Zap size={12} />
+              API 配置已自动管理。Pro 模式需授权付费项目 Key。
             </p>
           </div>
         </div>

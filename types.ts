@@ -1,6 +1,7 @@
 
 export interface UserSettings {
   age: number;
+  isProMode: boolean;
 }
 
 export interface HistoryItem {
@@ -22,7 +23,8 @@ export enum LessonType {
   IMAGE = 'IMAGE',
   HTML = 'HTML',
   SVG = 'SVG',
-  TEXT = 'TEXT'
+  TEXT = 'TEXT',
+  DIALOGUE = 'DIALOGUE'
 }
 
 export interface Annotation {

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { X, Clock, Trash2, History, LayoutPanelLeft, Sparkles, Palette, FileCode, Activity, AlignLeft } from 'lucide-react';
+import { X, Clock, Trash2, History, LayoutPanelLeft, Sparkles, Palette, FileCode, Activity, AlignLeft, MessageCircle } from 'lucide-react';
 import { HistoryItem, LessonType } from '../types';
 
 interface HistoryDrawerProps {
@@ -26,13 +26,15 @@ const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ items, workspace, onSelec
   const getLessonTypeInfo = (type: LessonType) => {
     switch (type) {
       case LessonType.IMAGE:
-        return { label: '形象绘图', icon: <Palette size={10} />, color: 'text-rose-600 bg-rose-50 border-rose-100' };
+        return { label: '画图', icon: <Palette size={10} />, color: 'text-rose-600 bg-rose-50 border-rose-100' };
       case LessonType.HTML:
-        return { label: '视觉图解', icon: <FileCode size={10} />, color: 'text-blue-600 bg-blue-50 border-blue-100' };
+        return { label: '图文', icon: <FileCode size={10} />, color: 'text-blue-600 bg-blue-50 border-blue-100' };
       case LessonType.SVG:
-        return { label: '交互动画', icon: <Activity size={10} />, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' };
+        return { label: '动画', icon: <Activity size={10} />, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' };
       case LessonType.TEXT:
-        return { label: '文字讲解', icon: <AlignLeft size={10} />, color: 'text-amber-600 bg-amber-50 border-amber-100' };
+        return { label: '文字', icon: <AlignLeft size={10} />, color: 'text-amber-600 bg-amber-50 border-amber-100' };
+      case LessonType.DIALOGUE:
+        return { label: '对话', icon: <MessageCircle size={10} />, color: 'text-indigo-600 bg-indigo-50 border-indigo-100' };
       default:
         return { label: '未知', icon: null, color: 'text-slate-600 bg-slate-50 border-slate-100' };
     }

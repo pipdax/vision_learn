@@ -374,7 +374,7 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
         </div>
         {screenshot && (
           <button onClick={() => onProcess(canvasRef.current!.toDataURL('image/png'))} disabled={isProcessing} className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-8 py-2.5 rounded-full font-bold transition-all shadow-lg active:scale-95 disabled:opacity-50">
-            {isProcessing ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" /> : <Sparkles size={18} />}分析内容
+            {isProcessing ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" /> : <Sparkles size={18} />}分析知识点
           </button>
         )}
       </div>
