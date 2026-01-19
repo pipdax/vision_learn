@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { X, Clock, Trash2, History, LayoutPanelLeft, Sparkles } from 'lucide-react';
-import { HistoryItem } from '../types';
+import { X, Clock, Trash2, History, LayoutPanelLeft, Sparkles, Palette, FileCode, Activity, AlignLeft } from 'lucide-react';
+import { HistoryItem, LessonType } from '../types';
 
 interface HistoryDrawerProps {
   items: HistoryItem[];
@@ -18,6 +18,25 @@ interface HistoryDrawerProps {
 
 const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ items, workspace, onSelect, onSelectWorkspace, onDelete, onClose }) => {
   const hasWorkspaceContent = workspace.currentScreenshot || workspace.topics.length > 0;
+
+  const truncate = (text: string, length: number = 8) => {
+    return text.length > length ? text.substring(0, length) + ".." : text;
+  };
+
+  const getLessonTypeInfo = (type: LessonType) => {
+    switch (type) {
+      case LessonType.IMAGE:
+        return { label: '形象绘图', icon: <Palette size={10} />, color: 'text-rose-600 bg-rose-50 border-rose-100' };
+      case LessonType.HTML:
+        return { label: '视觉图解', icon: <FileCode size={10} />, color: 'text-blue-600 bg-blue-50 border-blue-100' };
+      case LessonType.SVG:
+        return { label: '交互动画', icon: <Activity size={10} />, color: 'text-emerald-600 bg-emerald-50 border-emerald-100' };
+      case LessonType.TEXT:
+        return { label: '文字讲解', icon: <AlignLeft size={10} />, color: 'text-amber-600 bg-amber-50 border-amber-100' };
+      default:
+        return { label: '未知', icon: null, color: 'text-slate-600 bg-slate-50 border-slate-100' };
+    }
+  };
 
   return (
     <div className="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl z-[100] flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-300">
@@ -63,7 +82,7 @@ const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ items, workspace, onSelec
                   ) : (
                     workspace.topics.slice(0, 3).map(t => (
                       <span key={t} className="text-[9px] px-2 py-0.5 bg-white text-blue-600 border border-blue-100 rounded-full font-medium">
-                        {t}
+                        {truncate(t)}
                       </span>
                     ))
                   )}
@@ -86,40 +105,47 @@ const HistoryDrawer: React.FC<HistoryDrawerProps> = ({ items, workspace, onSelec
               <p className="text-xs">暂无存档</p>
             </div>
           ) : (
-            items.map(item => (
-              <div
-                key={item.id}
-                className="group relative bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer"
-                onClick={() => onSelect(item)}
-              >
-                <div className="aspect-video w-full overflow-hidden bg-slate-100">
-                  <img src={item.thumbnail} alt="Lesson screenshot" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                </div>
-                <div className="p-3">
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {item.topics.slice(0, 2).map(t => (
-                      <span key={t} className="text-[10px] px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full font-medium border border-indigo-100">
-                        {t}
-                      </span>
-                    ))}
-                    {item.topics.length > 2 && <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">+{item.topics.length - 2}</span>}
-                  </div>
-                  <div className="text-[9px] text-slate-400 flex items-center gap-1">
-                    <Clock size={10} />
-                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(item.id);
-                  }}
-                  className="absolute top-2 right-2 p-1.5 bg-white/90 text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 shadow-sm border border-red-100"
+            items.map(item => {
+              const typeInfo = getLessonTypeInfo(item.lessonType);
+              return (
+                <div
+                  key={item.id}
+                  className="group relative bg-white border border-slate-200 rounded-xl overflow-hidden hover:border-indigo-400 hover:shadow-md transition-all cursor-pointer"
+                  onClick={() => onSelect(item)}
                 >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))
+                  <div className="aspect-video w-full overflow-hidden bg-slate-100 relative">
+                    <img src={item.thumbnail} alt="Lesson screenshot" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                    <div className={`absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold border ${typeInfo.color} shadow-sm backdrop-blur-sm bg-opacity-90`}>
+                      {typeInfo.icon}
+                      {typeInfo.label}
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {item.topics.slice(0, 3).map(t => (
+                        <span key={t} className="text-[10px] px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full font-medium border border-indigo-100">
+                          {truncate(t)}
+                        </span>
+                      ))}
+                      {item.topics.length > 3 && <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">+{item.topics.length - 3}</span>}
+                    </div>
+                    <div className="text-[9px] text-slate-400 flex items-center gap-1">
+                      <Clock size={10} />
+                      {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(item.id);
+                    }}
+                    className="absolute top-2 right-2 p-1.5 bg-white/90 text-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 shadow-sm border border-red-100"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       </div>

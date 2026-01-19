@@ -9,6 +9,7 @@ export interface HistoryItem {
   topics: string[];
   htmlContent: string;
   thumbnail: string;
+  lessonType: LessonType;
 }
 
 export enum ToolType {
@@ -20,7 +21,8 @@ export enum ToolType {
 export enum LessonType {
   IMAGE = 'IMAGE',
   HTML = 'HTML',
-  SVG = 'SVG'
+  SVG = 'SVG',
+  TEXT = 'TEXT'
 }
 
 export interface Annotation {

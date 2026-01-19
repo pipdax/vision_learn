@@ -19,7 +19,8 @@ import {
   Layers,
   X,
   Plus,
-  Check
+  Check,
+  AlignLeft
 } from 'lucide-react';
 import CameraCanvas from './components/CameraCanvas';
 import SettingsModal from './components/SettingsModal';
@@ -206,7 +207,8 @@ const App: React.FC = () => {
         timestamp: Date.now(),
         topics: selectedTopics,
         htmlContent: html,
-        thumbnail: currentScreenshot || ''
+        thumbnail: currentScreenshot || '',
+        lessonType: lessonType
       };
       setHistory(prev => [newItem, ...prev].slice(0, 50));
     } catch (error) {
@@ -239,6 +241,7 @@ const App: React.FC = () => {
     setCurrentScreenshot(item.thumbnail);
     setTopics(item.topics);
     setSelectedTopics(item.topics);
+    setLessonType(item.lessonType);
     setIsHistoryOpen(false);
   };
 
@@ -437,9 +440,10 @@ const App: React.FC = () => {
           </div>
 
           <div className="p-6 border-t border-slate-100 flex flex-col gap-4 items-center bg-white flex-shrink-0">
-             <div className="flex p-1 bg-slate-100 rounded-xl w-full max-w-sm">
+             <div className="flex p-1 bg-slate-100 rounded-xl w-full max-w-lg">
                 {[
                   { id: LessonType.IMAGE, icon: <Palette size={16} />, label: "形象绘图" },
+                  { id: LessonType.TEXT, icon: <AlignLeft size={16} />, label: "文字讲解" },
                   { id: LessonType.HTML, icon: <FileCode size={16} />, label: "视觉图解" },
                   { id: LessonType.SVG, icon: <Activity size={16} />, label: "交互动画" }
                 ].map((type) => (
