@@ -299,6 +299,7 @@ const App: React.FC = () => {
     <div className={`flex h-screen w-screen overflow-hidden bg-slate-50 font-sans select-none ${isResizing ? 'cursor-col-resize' : ''}`}>
       <main ref={containerRef} className="flex flex-1 w-full overflow-hidden relative">
         <div 
+          id="capture-panel"
           className={`h-full overflow-hidden bg-slate-900 transition-[width] duration-300 ease-in-out relative flex-shrink-0`}
           style={{ width: isCollapsed ? '0%' : `${leftPanelWidth}%` }}
         >

@@ -19,6 +19,7 @@ const steps: Step[] = [
   },
   {
     id: 'capture',
+    targetId: 'capture-panel',
     title: '1. 捕捉素材',
     content: '通过左侧面板，你可以开启摄像头实时拍照、上传本地图片、粘贴剪贴板内容，或者直接输入一段文字供 AI 分析。',
     icon: <Camera className="text-blue-500" size={24} />
@@ -121,8 +122,14 @@ const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onComplete }) => {
             : 'w-80'
         }`}
         style={spotlightRect ? {
-          top: spotlightRect.bottom + 24 > window.innerHeight - 300 ? spotlightRect.top - 280 : spotlightRect.bottom + 24,
-          left: Math.max(20, Math.min(window.innerWidth - 340, spotlightRect.left + spotlightRect.width / 2 - 160))
+          // If tall sidebar (likely capture-panel), center vertically.
+          top: spotlightRect.height > window.innerHeight * 0.8
+            ? Math.max(20, window.innerHeight / 2 - 160)
+            : (spotlightRect.bottom + 24 > window.innerHeight - 300 ? Math.max(20, spotlightRect.top - 280) : spotlightRect.bottom + 24),
+          // If sidebar on left, place to right. If target is wide, center horizontally.
+          left: spotlightRect.height > window.innerHeight * 0.8 && spotlightRect.left < 50
+            ? spotlightRect.right + 24
+            : Math.max(20, Math.min(window.innerWidth - 340, spotlightRect.left + spotlightRect.width / 2 - 160))
         } : {}}
       >
         <div className="bg-white rounded-[32px] p-8 shadow-2xl border border-white/20 relative w-full group overflow-hidden">
