@@ -16,6 +16,7 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number>(16 / 9);
   const [tool, setTool] = useState<ToolType>(ToolType.RECT);
   const [color, setColor] = useState('#ef4444');
   const [lineWidth, setLineWidth] = useState(4);
@@ -27,9 +28,18 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
   const [isTextInputOpen, setIsTextInputOpen] = useState(false);
   const [manualText, setManualText] = useState('');
 
+  const handleUserMedia = useCallback((stream: MediaStream) => {
+    const track = stream.getVideoTracks()[0];
+    const settings = track.getSettings();
+    if (settings.width && settings.height) {
+      setVideoAspectRatio(settings.width / settings.height);
+    }
+  }, []);
+
   const capture = useCallback(() => {
     if (!isCameraOn) {
       setIsCameraOn(true);
+      // Wait a bit for the camera to stabilize if it was just turned on
       setTimeout(() => {
         const imageSrc = webcamRef.current?.getScreenshot();
         if (imageSrc) {
@@ -37,7 +47,7 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
           setAnnotations([]);
           setCropArea(null);
         }
-      }, 800);
+      }, 1000);
       return;
     }
 
@@ -51,6 +61,9 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
 
   const toggleCamera = () => {
     setIsCameraOn(prev => !prev);
+    if (!isCameraOn) {
+        setVideoAspectRatio(16 / 9); // Reset to default when turning on to avoid jump
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,12 +186,15 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
     const img = new Image();
     img.src = screenshot;
     img.onload = () => {
+      // Adjust internal canvas size to image aspect ratio if needed
+      // To keep standard coordinates, we'll keep a fixed internal size but draw precisely
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const hRatio = canvas.width / img.width;
       const vRatio = canvas.height / img.height;
       const ratio = Math.min(hRatio, vRatio);
       const centerShiftX = (canvas.width - img.width * ratio) / 2;
       const centerShiftY = (canvas.height - img.height * ratio) / 2;
+      
       ctx.drawImage(img, 0, 0, img.width, img.height, centerShiftX, centerShiftY, img.width * ratio, img.height * ratio);
       
       [...annotations, ...(currentAnnotation ? [currentAnnotation] : [])].forEach(ann => {
@@ -311,14 +327,18 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
       <div className="flex-1 relative flex flex-col items-center justify-center p-4 gap-6">
         {!screenshot ? (
           <>
-            <div className="relative w-full max-w-2xl aspect-video rounded-2xl overflow-hidden shadow-2xl bg-black border border-slate-700 group">
+            <div 
+              className="relative w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl bg-black border border-slate-700 group transition-all duration-500"
+              style={{ aspectRatio: `${videoAspectRatio}` }}
+            >
               {isCameraOn ? (
                 <Webcam
                   audio={false}
                   ref={webcamRef}
+                  onUserMedia={handleUserMedia}
                   screenshotFormat="image/png"
-                  className="w-full h-full object-cover"
-                  videoConstraints={{ facingMode: "environment", width: 1280, height: 720 }}
+                  className="w-full h-full object-contain"
+                  videoConstraints={{ facingMode: "environment" }}
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-500 gap-4">
@@ -356,7 +376,19 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
           </>
         ) : (
           <div className="relative w-full h-full flex items-center justify-center">
-             <canvas ref={canvasRef} width={1280} height={720} className="max-w-full max-h-full aspect-video rounded-2xl shadow-2xl bg-black cursor-crosshair touch-none transition-all duration-300" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} />
+             <canvas 
+               ref={canvasRef} 
+               width={1280} 
+               height={720} 
+               className="max-w-full max-h-full rounded-2xl shadow-2xl bg-black cursor-crosshair touch-none transition-all duration-300" 
+               onMouseDown={handleMouseDown} 
+               onMouseMove={handleMouseMove} 
+               onMouseUp={handleMouseUp} 
+               style={{ 
+                 aspectRatio: videoAspectRatio ? `${videoAspectRatio}` : 'auto',
+                 objectFit: 'contain'
+               }}
+             />
               {cropArea && tool === ToolType.CROP && !isDrawing && (
                 <div className="absolute z-10 flex gap-2" style={{ left: `${(cropArea.x / 1280) * 100}%`, top: `${((cropArea.y + cropArea.h + 10) / 720) * 100}%` }}>
                   <button onClick={applyCrop} className="bg-emerald-500 text-white p-2 rounded-full shadow-lg hover:bg-emerald-600 transition-colors"><Check size={20} /></button>
