@@ -1,15 +1,16 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCw, Square, PenTool, Eraser, Sparkles, Undo2, Circle, Upload, ClipboardPaste, Crop, Check, X, CameraOff, Video } from 'lucide-react';
+import { Camera, RefreshCw, Square, PenTool, Eraser, Sparkles, Undo2, Circle, Upload, ClipboardPaste, Crop, Check, X, CameraOff, Video, Type as TypeIcon } from 'lucide-react';
 import { ToolType, Annotation } from '../types';
 
 interface CameraCanvasProps {
   onProcess: (finalImage: string) => void;
+  onProcessText: (text: string) => void;
   isProcessing: boolean;
 }
 
-const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) => {
+const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, isProcessing }) => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -23,6 +24,8 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
   const [isDrawing, setIsDrawing] = useState(false);
   const [cropArea, setCropArea] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
   const [showPasteTooltip, setShowPasteTooltip] = useState(false);
+  const [isTextInputOpen, setIsTextInputOpen] = useState(false);
+  const [manualText, setManualText] = useState('');
 
   const capture = useCallback(() => {
     if (!isCameraOn) {
@@ -98,7 +101,6 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
   };
 
   const triggerPaste = async () => {
-    // Show tooltip immediately to inform user about the hotkey fallback
     setShowPasteTooltip(true);
     setTimeout(() => setShowPasteTooltip(false), 4000);
 
@@ -107,9 +109,7 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
         throw new Error("您的浏览器不支持 Clipboard API");
       }
 
-      // Read clipboard items
       const clipboardItems = await navigator.clipboard.read().catch(err => {
-        // Handle the specific 'permissions policy' error silently here to let the tooltip do the talking
         if (err.name === 'NotAllowedError' || err.message.includes('permissions policy')) {
           console.warn("Clipboard API blocked by policy. Falling back to hotkey hint.");
           return null;
@@ -296,6 +296,14 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
     };
   };
 
+  const handleTextSubmit = () => {
+    if (manualText.trim()) {
+      onProcessText(manualText);
+      setIsTextInputOpen(false);
+      setManualText('');
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-900 overflow-hidden relative border-r border-slate-700">
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="image/*" className="hidden" />
@@ -367,23 +375,28 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
                 <Camera size={18} />捕捉画面
               </button>
               <button onClick={triggerUpload} className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-full font-semibold transition-all shadow-lg active:scale-95">
-                <Upload size={18} />本地文件
+                <Upload size={18} />本地图片
               </button>
               
-              <div className="relative">
-                <button onClick={triggerPaste} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-full font-semibold transition-all shadow-lg active:scale-95">
-                  <ClipboardPaste size={18} />剪贴板
+              <div className="flex gap-2 items-center">
+                <button onClick={() => setIsTextInputOpen(true)} className="flex items-center gap-2 bg-indigo-700 hover:bg-indigo-600 text-white px-5 py-2.5 rounded-full font-semibold transition-all shadow-lg active:scale-95">
+                  <TypeIcon size={18} />输入文本
                 </button>
-                
-                {/* Fallback Tooltip */}
-                {showPasteTooltip && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 p-3 bg-slate-900 text-white text-[11px] rounded-xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-2 z-50">
-                    <div className="relative">
-                      如果图片未自动粘贴，请直接在页面按 <span className="bg-white/20 px-1.5 py-0.5 rounded font-mono font-bold">Ctrl+V</span> 直接粘贴。
-                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
+
+                <div className="relative">
+                  <button onClick={triggerPaste} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-full font-semibold transition-all shadow-lg active:scale-95">
+                    <ClipboardPaste size={18} />剪贴板
+                  </button>
+                  
+                  {showPasteTooltip && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 p-3 bg-slate-900 text-white text-[11px] rounded-xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-2 z-50">
+                      <div className="relative">
+                        如果图片未自动粘贴，请直接在页面按 <span className="bg-white/20 px-1.5 py-0.5 rounded font-mono font-bold">Ctrl+V</span> 直接粘贴。
+                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           ) : (
@@ -414,6 +427,48 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
           </button>
         )}
       </div>
+
+      {/* Text Input Modal */}
+      {isTextInputOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-slate-800 font-bold">
+                <TypeIcon className="text-indigo-600" size={20} />
+                分析文本内容
+              </div>
+              <button onClick={() => setIsTextInputOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <textarea
+                autoFocus
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                placeholder="在此输入或粘贴需要分析的知识内容文本..."
+                className="w-full h-40 p-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-300 text-sm resize-none"
+              />
+              <p className="mt-2 text-[10px] text-slate-400">AI 将根据输入的文本内容自动拆解核心知识点。</p>
+            </div>
+            <div className="px-6 py-4 bg-slate-50 flex justify-end gap-3">
+              <button
+                onClick={() => setIsTextInputOpen(false)}
+                className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-xl transition-colors text-sm"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleTextSubmit}
+                disabled={!manualText.trim()}
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-900/20 transition-all active:scale-95 text-sm disabled:opacity-50"
+              >
+                开始分析
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

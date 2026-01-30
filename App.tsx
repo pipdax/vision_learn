@@ -27,6 +27,7 @@ import {
 import CameraCanvas from './components/CameraCanvas';
 import SettingsModal from './components/SettingsModal';
 import HistoryDrawer from './components/HistoryDrawer';
+import OnboardingGuide from './components/OnboardingGuide';
 import { UserSettings, HistoryItem, LessonType } from './types';
 import { GeminiService } from './services/geminiService';
 
@@ -40,6 +41,10 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     const saved = localStorage.getItem('visionlearn_history');
     return saved ? JSON.parse(saved) : [];
+  });
+
+  const [isFirstVisit, setIsFirstVisit] = useState(() => {
+    return !localStorage.getItem('visionlearn_has_visited');
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -88,6 +93,11 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('visionlearn_history', JSON.stringify(history));
   }, [history]);
+
+  const handleOnboardingComplete = () => {
+    localStorage.setItem('visionlearn_has_visited', 'true');
+    setIsFirstVisit(false);
+  };
 
   const startResizing = useCallback((e: React.MouseEvent) => {
     setIsResizing(true);
@@ -148,6 +158,32 @@ const App: React.FC = () => {
     }
   };
 
+  const handleProcessText = async (text: string) => {
+    setIsProcessing(true);
+    setCurrentScreenshot(null); 
+    setCurrentHtml(null);
+    setTopics([]);
+    setSelectedTopics([]);
+
+    setWorkspace({
+      currentScreenshot: null,
+      currentHtml: null,
+      topics: [],
+      selectedTopics: []
+    });
+
+    try {
+      const extractedTopics = await gemini.analyzeText(text, settings.age);
+      setTopics(extractedTopics);
+      setWorkspace(prev => ({ ...prev, topics: extractedTopics }));
+    } catch (error) {
+      console.error(error);
+      alert("知识点拆解失败");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleSubdivide = async () => {
     if (selectedTopics.length === 0) return;
     setIsProcessing(true);
@@ -194,7 +230,6 @@ const App: React.FC = () => {
   const handleGenerateLesson = async () => {
     if (selectedTopics.length === 0) return;
 
-    // Check for API Key if using Pro features and no manual key provided
     if (settings.isProMode && !settings.manualApiKey) {
       try {
         const hasKey = await (window as any).aistudio.hasSelectedApiKey();
@@ -268,7 +303,7 @@ const App: React.FC = () => {
           style={{ width: isCollapsed ? '0%' : `${leftPanelWidth}%` }}
         >
           <div className={`w-full h-full min-w-[400px] ${isCollapsed ? 'invisible opacity-0' : 'visible opacity-100'}`}>
-            <CameraCanvas onProcess={handleProcessImage} isProcessing={isProcessing} />
+            <CameraCanvas onProcess={handleProcessImage} onProcessText={handleProcessText} isProcessing={isProcessing} />
           </div>
         </div>
 
@@ -299,7 +334,7 @@ const App: React.FC = () => {
         )}
 
         <div className="flex-1 flex flex-col bg-white overflow-hidden relative min-w-0">
-          <div className="p-6 border-b border-slate-100 min-h-[140px]">
+          <div id="topics-area" className="p-6 border-b border-slate-100 min-h-[140px]">
             <div className="flex items-center justify-between mb-4 gap-4">
               <div className="flex items-center gap-2 text-slate-800 font-bold flex-shrink-0">
                 <Lightbulb className="text-amber-500" size={18} />
@@ -329,7 +364,7 @@ const App: React.FC = () => {
                   <button onClick={() => setIsHistoryOpen(true)} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
                     <HistoryIcon size={18} />
                   </button>
-                  <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all">
+                  <button id="settings-button" onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all">
                     <SettingsIcon size={18} />
                   </button>
                 </div>
@@ -401,7 +436,7 @@ const App: React.FC = () => {
                 <div className="p-8 bg-white rounded-full shadow-sm border border-slate-100">
                     <BookOpen size={48} className="opacity-20" />
                 </div>
-                <p className="text-sm">选择核心知识点，AI 将为你生成互动式可视化教学课件</p>
+                <p className="text-sm text-slate-500 font-medium">选择核心知识点，AI 将为你生成互动式可视化教学课件</p>
               </div>
             )}
           </div>
@@ -421,7 +456,7 @@ const App: React.FC = () => {
                  />
                </div>
 
-               <div className="flex p-1 bg-slate-100 rounded-xl w-full">
+               <div id="lesson-types" className="flex p-1 bg-slate-100 rounded-xl w-full">
                   {[
                     { id: LessonType.IMAGE, icon: <Palette size={16} />, label: "画图" },
                     { id: LessonType.TEXT, icon: <AlignLeft size={16} />, label: "文字" },
@@ -442,6 +477,7 @@ const App: React.FC = () => {
                </div>
 
                <button
+                  id="generate-button"
                   onClick={handleGenerateLesson}
                   disabled={selectedTopics.length === 0 || isProcessing}
                   className="group relative flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-10 py-3.5 rounded-full font-bold transition-all shadow-xl active:scale-95 w-full justify-center disabled:opacity-30"
@@ -478,6 +514,10 @@ const App: React.FC = () => {
           onSelectWorkspace={restoreWorkspace}
           onDelete={(id) => setHistory(prev => prev.filter(i => i.id !== id))}
         />
+      )}
+
+      {isFirstVisit && (
+        <OnboardingGuide onComplete={handleOnboardingComplete} />
       )}
 
       {isProcessing && (

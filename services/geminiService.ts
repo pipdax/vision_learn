@@ -53,6 +53,34 @@ export class GeminiService {
     return cleaned;
   }
 
+  async analyzeText(text: string, age: number): Promise<string[]> {
+    const response = await this.ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `你是一位严谨的学科知识架构师。针对以下文本内容，请为 ${age} 岁的学习者提取其中的专业核心知识点。
+      
+      文本内容：
+      "${text}"
+
+      要求：
+      1. 必须提取出背后的原子化概念。
+      2. 使用规范的学术或学科术语。
+      3. 直接输出 JSON 数组格式。`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      }
+    });
+
+    try {
+      return JSON.parse(this.cleanResponse(response.text || "[]"));
+    } catch (e) {
+      return [];
+    }
+  }
+
   async analyzeImage(base64Image: string, age: number): Promise<string[]> {
     const response = await this.ai.models.generateContent({
       model: 'gemini-3-flash-preview',
