@@ -2,6 +2,7 @@
 export interface UserSettings {
   age: number;
   isProMode: boolean;
+  manualApiKey?: string;
 }
 
 export interface HistoryItem {

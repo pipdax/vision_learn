@@ -30,19 +30,6 @@ import HistoryDrawer from './components/HistoryDrawer';
 import { UserSettings, HistoryItem, LessonType } from './types';
 import { GeminiService } from './services/geminiService';
 
-declare global {
-  /* Define AIStudio interface to match environmental expectations. */
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
-
-  interface Window {
-    // Removed readonly modifier to resolve the 'identical modifiers' error with existing global definitions.
-    aistudio: AIStudio;
-  }
-}
-
 const App: React.FC = () => {
   // State
   const [settings, setSettings] = useState<UserSettings>(() => {
@@ -64,12 +51,11 @@ const App: React.FC = () => {
   const [newTopicValue, setNewTopicValue] = useState('');
   const [extraRequirement, setExtraRequirement] = useState('');
   
-  // Workspace / Displayed States
   const [topics, setTopics] = useState<string[]>([]);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [currentHtml, setCurrentHtml] = useState<string | null>(null);
   const [currentScreenshot, setCurrentScreenshot] = useState<string | null>(null);
-  const [lessonType, setLessonType] = useState<LessonType>(LessonType.DIALOGUE); // Default to dialogue
+  const [lessonType, setLessonType] = useState<LessonType>(LessonType.DIALOGUE); 
 
   const [workspace, setWorkspace] = useState<{
     topics: string[],
@@ -83,7 +69,6 @@ const App: React.FC = () => {
     currentScreenshot: null
   });
 
-  // Layout States
   const [leftPanelWidth, setLeftPanelWidth] = useState(50);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -91,7 +76,11 @@ const App: React.FC = () => {
 
   const gemini = useMemo(() => new GeminiService(), []);
 
-  // Effects
+  // Update Gemini Service with manual key whenever settings change
+  useEffect(() => {
+    gemini.setApiKey(settings.manualApiKey);
+  }, [settings.manualApiKey, gemini]);
+
   useEffect(() => {
     localStorage.setItem('visionlearn_settings', JSON.stringify(settings));
   }, [settings]);
@@ -100,7 +89,6 @@ const App: React.FC = () => {
     localStorage.setItem('visionlearn_history', JSON.stringify(history));
   }, [history]);
 
-  // Resizing Handlers
   const startResizing = useCallback((e: React.MouseEvent) => {
     setIsResizing(true);
     e.preventDefault();
@@ -134,22 +122,17 @@ const App: React.FC = () => {
     };
   }, [isResizing, resize, stopResizing]);
 
-  // Handlers
   const handleProcessImage = async (base64Image: string) => {
     setIsProcessing(true);
-    const newScreenshot = base64Image;
-    const newHtml = null;
-    const newTopics: string[] = [];
-    
-    setCurrentScreenshot(newScreenshot);
-    setCurrentHtml(newHtml);
-    setTopics(newTopics);
+    setCurrentScreenshot(base64Image);
+    setCurrentHtml(null);
+    setTopics([]);
     setSelectedTopics([]);
 
     setWorkspace({
-      currentScreenshot: newScreenshot,
-      currentHtml: newHtml,
-      topics: newTopics,
+      currentScreenshot: base64Image,
+      currentHtml: null,
+      topics: [],
       selectedTopics: []
     });
 
@@ -178,7 +161,6 @@ const App: React.FC = () => {
       setSelectedTopics(newSubTopics);
       setWorkspace(w => ({ ...w, selectedTopics: newSubTopics }));
     } catch (error) {
-      console.error(error);
       alert("知识点下钻失败");
     } finally {
       setIsProcessing(false);
@@ -212,14 +194,16 @@ const App: React.FC = () => {
   const handleGenerateLesson = async () => {
     if (selectedTopics.length === 0) return;
 
-    if (settings.isProMode) {
+    // Check for API Key if using Pro features and no manual key provided
+    if (settings.isProMode && !settings.manualApiKey) {
       try {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
+        const hasKey = await (window as any).aistudio.hasSelectedApiKey();
         if (!hasKey) {
-          await window.aistudio.openSelectKey();
+          alert("Pro 模式需要配置个人付费 API Key 才能继续。");
+          await (window as any).aistudio.openSelectKey();
         }
       } catch (e) {
-        console.warn("API Key Selection ignored or not available in this environment.");
+        console.warn("API Key Selection ignored.");
       }
     }
 
@@ -241,8 +225,7 @@ const App: React.FC = () => {
     } catch (error: any) {
       console.error(error);
       if (error.message?.includes("Requested entity was not found")) {
-        alert("API Key 验证失败，请重新选择有效的付费项目 Key。");
-        await window.aistudio.openSelectKey();
+        alert("API Key 验证失败，请在设置中检查您的手动 Key 或重新选择平台 Key。");
       } else {
         alert("讲解内容生成失败");
       }
@@ -328,7 +311,6 @@ const App: React.FC = () => {
                     onClick={handleSubdivide}
                     disabled={selectedTopics.length === 0 || isProcessing}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-30 whitespace-nowrap"
-                    title="拆解为基础知识"
                   >
                     <Layers size={14} />
                     知识下钻
@@ -338,25 +320,16 @@ const App: React.FC = () => {
                     className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-colors whitespace-nowrap ${
                       isDeleteMode ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
-                    title="管理知识点列表"
                   >
                     <Trash2 size={14} />
                     {isDeleteMode ? '完成管理' : '管理列表'}
                   </button>
                 </div>
                 <div className="flex gap-2 pl-1">
-                  <button
-                    onClick={() => setIsHistoryOpen(true)}
-                    className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                    title="查看历史记录"
-                  >
+                  <button onClick={() => setIsHistoryOpen(true)} className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
                     <HistoryIcon size={18} />
                   </button>
-                  <button
-                    onClick={() => setIsSettingsOpen(true)}
-                    className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all"
-                    title="偏好设置"
-                  >
+                  <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all">
                     <SettingsIcon size={18} />
                   </button>
                 </div>
@@ -376,10 +349,7 @@ const App: React.FC = () => {
                     {topic}
                   </button>
                   {isDeleteMode && (
-                    <button
-                      onClick={() => deleteTopic(topic)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 bg-red-400 text-white rounded-full hover:bg-red-600 transition-colors"
-                    >
+                    <button onClick={() => deleteTopic(topic)} className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 bg-red-400 text-white rounded-full hover:bg-red-600 transition-colors">
                       <X size={12} />
                     </button>
                   )}
@@ -387,7 +357,7 @@ const App: React.FC = () => {
               ))}
               
               {isAddingTopic ? (
-                <div className="flex items-center gap-1 bg-white border border-blue-200 rounded-full pl-3 pr-1 py-0.5 shadow-sm animate-in fade-in slide-in-from-left-2 duration-200">
+                <div className="flex items-center gap-1 bg-white border border-blue-200 rounded-full pl-3 pr-1 py-0.5 shadow-sm">
                   <input
                     autoFocus
                     type="text"
@@ -397,39 +367,17 @@ const App: React.FC = () => {
                     placeholder="输入知识点..."
                     className="bg-transparent border-none outline-none text-sm text-slate-700 w-32"
                   />
-                  <button 
-                    onClick={handleAddManualTopic}
-                    className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
-                  >
+                  <button onClick={handleAddManualTopic} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded-full">
                     <Check size={14} />
                   </button>
-                  <button 
-                    onClick={() => { setIsAddingTopic(false); setNewTopicValue(''); }}
-                    className="p-1 text-slate-400 hover:bg-slate-50 rounded-full transition-colors"
-                  >
+                  <button onClick={() => setIsAddingTopic(false)} className="p-1 text-slate-400 hover:bg-slate-50 rounded-full">
                     <X size={14} />
                   </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => setIsAddingTopic(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-slate-400 border border-dashed border-slate-300 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all"
-                  title="手动添加知识点"
-                >
-                  <Plus size={14} />
-                  添加
+                <button onClick={() => setIsAddingTopic(true)} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-slate-400 border border-dashed border-slate-300 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all">
+                  <Plus size={14} /> 添加
                 </button>
-              )}
-
-              {topics.length === 0 && !isAddingTopic && !isProcessing && (
-                <p className="text-slate-400 text-sm italic ml-2">
-                  拍照并标注感兴趣的部分，或手动添加知识点
-                </p>
-              )}
-              {isProcessing && topics.length === 0 && (
-                <p className="text-slate-400 text-sm italic ml-2 animate-pulse">
-                  正在分析图像内容...
-                </p>
               )}
             </div>
           </div>
@@ -438,28 +386,15 @@ const App: React.FC = () => {
             {currentHtml ? (
               <div className={`
                 bg-white shadow-xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-500 transition-all
-                ${isContentFullscreen 
-                  ? 'fixed inset-0 z-[150] rounded-none' 
-                  : 'w-full h-full rounded-2xl'
-                }
+                ${isContentFullscreen ? 'fixed inset-0 z-[150] rounded-none' : 'w-full h-full rounded-2xl'}
               `}>
                 <button
                   onClick={() => setIsContentFullscreen(!isContentFullscreen)}
-                  className="absolute top-4 right-4 z-[160] p-2 bg-white/80 backdrop-blur-md border border-slate-200 rounded-xl shadow-lg hover:bg-white text-slate-600 transition-all hover:scale-105 active:scale-95 group"
-                  title={isContentFullscreen ? "退出全屏" : "全屏显示"}
+                  className="absolute top-4 right-4 z-[160] p-2 bg-white/80 backdrop-blur-md border border-slate-200 rounded-xl shadow-lg hover:bg-white text-slate-600 transition-all"
                 >
-                  {isContentFullscreen ? (
-                    <Minimize2 size={20} className="group-hover:text-blue-600" />
-                  ) : (
-                    <Maximize2 size={20} className="group-hover:text-blue-600" />
-                  )}
+                  {isContentFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
                 </button>
-                <iframe
-                  srcDoc={currentHtml}
-                  className="w-full h-full border-none"
-                  title="Lesson content"
-                  sandbox="allow-scripts"
-                />
+                <iframe srcDoc={currentHtml} className="w-full h-full border-none" title="Lesson content" sandbox="allow-scripts" />
               </div>
             ) : (
               <div className="flex flex-col items-center gap-4 text-slate-400 text-center max-w-xs">
@@ -473,7 +408,6 @@ const App: React.FC = () => {
 
           <div className="p-6 border-t border-slate-100 flex flex-col gap-4 items-center bg-white flex-shrink-0">
              <div className="w-full max-w-lg space-y-4">
-               {/* Extra Requirements Input */}
                <div className="relative group">
                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors pointer-events-none">
                    <Pencil size={14} />
@@ -482,8 +416,8 @@ const App: React.FC = () => {
                    type="text"
                    value={extraRequirement}
                    onChange={(e) => setExtraRequirement(e.target.value)}
-                   placeholder="额外要求（如：多用动物做比喻、加入小测试...）"
-                   className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder:text-slate-400"
+                   placeholder="额外要求（如：多用动物做比喻...）"
+                   className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-400"
                  />
                </div>
 
@@ -499,13 +433,10 @@ const App: React.FC = () => {
                       key={type.id}
                       onClick={() => setLessonType(type.id)}
                       className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all ${
-                        lessonType === type.id 
-                        ? 'bg-white text-blue-600 shadow-sm' 
-                        : 'text-slate-500 hover:text-slate-700'
+                        lessonType === type.id ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'
                       }`}
                     >
-                      {type.icon}
-                      {type.label}
+                      {type.icon} {type.label}
                     </button>
                   ))}
                </div>
@@ -513,7 +444,7 @@ const App: React.FC = () => {
                <button
                   onClick={handleGenerateLesson}
                   disabled={selectedTopics.length === 0 || isProcessing}
-                  className="group relative flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-10 py-3.5 rounded-full font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-xl active:scale-95 w-full justify-center"
+                  className="group relative flex items-center gap-3 bg-slate-900 hover:bg-slate-800 text-white px-10 py-3.5 rounded-full font-bold transition-all shadow-xl active:scale-95 w-full justify-center disabled:opacity-30"
                >
                   {isProcessing ? (
                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
@@ -553,13 +484,11 @@ const App: React.FC = () => {
           <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-slate-950/40 backdrop-blur-md pointer-events-none transition-opacity">
              <div className="relative">
                 <div className="w-24 h-24 border-4 border-white/20 rounded-full animate-ping" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <Sparkles className="text-white animate-bounce" size={40} />
+                <div className="absolute inset-0 flex items-center justify-center text-white">
+                    <Sparkles size={40} className="animate-bounce" />
                 </div>
              </div>
-             <p className="mt-8 text-white font-bold text-xl tracking-widest animate-pulse">
-                AI 正在生成内容...
-             </p>
+             <p className="mt-8 text-white font-bold text-xl tracking-widest animate-pulse">AI 正在生成内容...</p>
           </div>
       )}
     </div>

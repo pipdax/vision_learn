@@ -22,11 +22,11 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
   const [currentAnnotation, setCurrentAnnotation] = useState<Annotation | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [cropArea, setCropArea] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const [showPasteTooltip, setShowPasteTooltip] = useState(false);
 
   const capture = useCallback(() => {
     if (!isCameraOn) {
       setIsCameraOn(true);
-      // 给摄像头一点启动时间
       setTimeout(() => {
         const imageSrc = webcamRef.current?.getScreenshot();
         if (imageSrc) {
@@ -98,33 +98,58 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
   };
 
   const triggerPaste = async () => {
+    // Show tooltip immediately to inform user about the hotkey fallback
+    setShowPasteTooltip(true);
+    setTimeout(() => setShowPasteTooltip(false), 4000);
+
     try {
-      if (!navigator.clipboard || !navigator.clipboard.read) {
-        throw new Error("Clipboard API not supported");
+      if (!navigator.clipboard) {
+        throw new Error("您的浏览器不支持 Clipboard API");
       }
-      const clipboardItems = await navigator.clipboard.read();
+
+      // Read clipboard items
+      const clipboardItems = await navigator.clipboard.read().catch(err => {
+        // Handle the specific 'permissions policy' error silently here to let the tooltip do the talking
+        if (err.name === 'NotAllowedError' || err.message.includes('permissions policy')) {
+          console.warn("Clipboard API blocked by policy. Falling back to hotkey hint.");
+          return null;
+        }
+        throw err;
+      });
+
+      if (!clipboardItems) return;
+
       let foundImage = false;
       for (const clipboardItem of clipboardItems) {
-        for (const type of clipboardItem.types) {
-          if (type.startsWith('image/')) {
-            const blob = await clipboardItem.getType(type);
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              const result = event.target?.result as string;
-              setScreenshot(result);
-              setAnnotations([]);
-              setCropArea(null);
-              setIsCameraOn(false);
-            };
-            reader.readAsDataURL(blob);
-            foundImage = true;
-            return;
-          }
+        const imageType = clipboardItem.types.find(type => type.startsWith('image/'));
+        if (imageType) {
+          const blob = await clipboardItem.getType(imageType);
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const result = event.target?.result as string;
+            setScreenshot(result);
+            setAnnotations([]);
+            setCropArea(null);
+            setIsCameraOn(false);
+          };
+          reader.readAsDataURL(blob);
+          foundImage = true;
+          break;
         }
       }
-      if (!foundImage) alert("剪贴板中没有图片。");
+
+      if (!foundImage) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.startsWith('data:image/')) {
+          setScreenshot(text);
+          setAnnotations([]);
+          setCropArea(null);
+          setIsCameraOn(false);
+          foundImage = true;
+        }
+      }
     } catch (err: any) {
-      alert("无法读取剪贴板，请尝试 Ctrl+V 手动粘贴。");
+      console.error("Clipboard Error:", err);
     }
   };
 
@@ -296,7 +321,6 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
                 </div>
               )}
 
-              {/* 右上角开关 */}
               <div className="absolute top-4 right-4 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 group-hover:bg-black/60 transition-colors shadow-lg">
                 <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isCameraOn ? 'text-blue-400' : 'text-white/40'}`}>
                   {isCameraOn ? 'Live' : 'Off'}
@@ -309,7 +333,6 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
                 </button>
               </div>
 
-              {/* 装饰边角 */}
               <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-white/20 rounded-tl-lg pointer-events-none" />
               <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-white/20 rounded-bl-lg pointer-events-none" />
               <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-white/20 rounded-br-lg pointer-events-none" />
@@ -339,16 +362,29 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, isProcessing }) 
       <div className="bg-slate-800/80 backdrop-blur-md border-t border-slate-700 p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           {!screenshot ? (
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <button onClick={capture} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-full font-semibold transition-all shadow-lg shadow-blue-900/20 active:scale-95">
                 <Camera size={18} />捕捉画面
               </button>
               <button onClick={triggerUpload} className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-5 py-2.5 rounded-full font-semibold transition-all shadow-lg active:scale-95">
                 <Upload size={18} />本地文件
               </button>
-              <button onClick={triggerPaste} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-full font-semibold transition-all shadow-lg active:scale-95">
-                <ClipboardPaste size={18} />剪贴板
-              </button>
+              
+              <div className="relative">
+                <button onClick={triggerPaste} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-full font-semibold transition-all shadow-lg active:scale-95">
+                  <ClipboardPaste size={18} />剪贴板
+                </button>
+                
+                {/* Fallback Tooltip */}
+                {showPasteTooltip && (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 p-3 bg-slate-900 text-white text-[11px] rounded-xl shadow-2xl border border-slate-700 animate-in fade-in slide-in-from-bottom-2 z-50">
+                    <div className="relative">
+                      如果图片未自动粘贴，请直接在页面按 <span className="bg-white/20 px-1.5 py-0.5 rounded font-mono font-bold">Ctrl+V</span> 直接粘贴。
+                      <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 border-8 border-transparent border-t-slate-900"></div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <>
