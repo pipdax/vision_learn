@@ -22,7 +22,8 @@ import {
   Check,
   AlignLeft,
   Pencil,
-  MessageCircle
+  MessageCircle,
+  XCircle
 } from 'lucide-react';
 import CameraCanvas from './components/CameraCanvas';
 import SettingsModal from './components/SettingsModal';
@@ -78,6 +79,7 @@ const App: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const gemini = useMemo(() => new GeminiService(), []);
 
@@ -93,6 +95,25 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('visionlearn_history', JSON.stringify(history));
   }, [history]);
+
+  // Global escape key handler to cancel processing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isProcessing) {
+        handleCancel();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isProcessing]);
+
+  const handleCancel = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsProcessing(false);
+  }, []);
 
   const handleOnboardingComplete = () => {
     localStorage.setItem('visionlearn_has_visited', 'true');
@@ -146,15 +167,25 @@ const App: React.FC = () => {
       selectedTopics: []
     });
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const extractedTopics = await gemini.analyzeImage(base64Image, settings.age);
+      const extractedTopics = await gemini.analyzeImage(base64Image, settings.age, { signal: controller.signal });
       setTopics(extractedTopics);
       setWorkspace(prev => ({ ...prev, topics: extractedTopics }));
-    } catch (error) {
-      console.error(error);
-      alert("知识点拆解失败");
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log("Image analysis aborted");
+      } else {
+        console.error(error);
+        alert("知识点拆解失败");
+      }
     } finally {
-      setIsProcessing(false);
+      if (abortControllerRef.current === controller) {
+        setIsProcessing(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -172,23 +203,37 @@ const App: React.FC = () => {
       selectedTopics: []
     });
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const extractedTopics = await gemini.analyzeText(text, settings.age);
+      const extractedTopics = await gemini.analyzeText(text, settings.age, { signal: controller.signal });
       setTopics(extractedTopics);
       setWorkspace(prev => ({ ...prev, topics: extractedTopics }));
-    } catch (error) {
-      console.error(error);
-      alert("知识点拆解失败");
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log("Text analysis aborted");
+      } else {
+        console.error(error);
+        alert("知识点拆解失败");
+      }
     } finally {
-      setIsProcessing(false);
+      if (abortControllerRef.current === controller) {
+        setIsProcessing(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
   const handleSubdivide = async () => {
     if (selectedTopics.length === 0) return;
     setIsProcessing(true);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const newSubTopics = await gemini.subdivideTopics(selectedTopics, settings.age);
+      const newSubTopics = await gemini.subdivideTopics(selectedTopics, settings.age, { signal: controller.signal });
       setTopics(prev => {
         const next = [...new Set([...prev, ...newSubTopics])];
         setWorkspace(w => ({ ...w, topics: next }));
@@ -196,10 +241,17 @@ const App: React.FC = () => {
       });
       setSelectedTopics(newSubTopics);
       setWorkspace(w => ({ ...w, selectedTopics: newSubTopics }));
-    } catch (error) {
-      alert("知识点下钻失败");
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.log("Subdivision aborted");
+      } else {
+        alert("知识点下钻失败");
+      }
     } finally {
-      setIsProcessing(false);
+      if (abortControllerRef.current === controller) {
+        setIsProcessing(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -243,8 +295,11 @@ const App: React.FC = () => {
     }
 
     setIsProcessing(true);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const html = await gemini.generateLesson(selectedTopics, settings.age, lessonType, settings.isProMode, extraRequirement);
+      const html = await gemini.generateLesson(selectedTopics, settings.age, lessonType, settings.isProMode, extraRequirement, { signal: controller.signal });
       setCurrentHtml(html);
       setWorkspace(prev => ({ ...prev, currentHtml: html }));
 
@@ -258,14 +313,19 @@ const App: React.FC = () => {
       };
       setHistory(prev => [newItem, ...prev].slice(0, 50));
     } catch (error: any) {
-      console.error(error);
-      if (error.message?.includes("Requested entity was not found")) {
+      if (error.name === 'AbortError') {
+        console.log("Generation aborted");
+      } else if (error.message?.includes("Requested entity was not found")) {
         alert("API Key 验证失败，请在设置中检查您的手动 Key 或重新选择平台 Key。");
       } else {
+        console.error(error);
         alert("讲解内容生成失败");
       }
     } finally {
-      setIsProcessing(false);
+      if (abortControllerRef.current === controller) {
+        setIsProcessing(false);
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -522,14 +582,28 @@ const App: React.FC = () => {
       )}
 
       {isProcessing && (
-          <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-slate-950/40 backdrop-blur-md pointer-events-none transition-opacity">
+          <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-slate-950/40 backdrop-blur-md transition-opacity">
              <div className="relative">
                 <div className="w-24 h-24 border-4 border-white/20 rounded-full animate-ping" />
                 <div className="absolute inset-0 flex items-center justify-center text-white">
                     <Sparkles size={40} className="animate-bounce" />
                 </div>
              </div>
-             <p className="mt-8 text-white font-bold text-xl tracking-widest animate-pulse">AI 正在生成内容...</p>
+             
+             <div className="mt-8 text-center space-y-4 max-w-sm px-6">
+                <p className="text-white font-bold text-xl tracking-widest animate-pulse">AI 正在生成内容...</p>
+                <p className="text-white/60 text-xs leading-relaxed">
+                  AI正在生成过程中，可以按 <span className="text-white/90 font-mono bg-white/10 px-1.5 py-0.5 rounded">ESC</span> 取消，或者点击下方取消键。
+                </p>
+                
+                <button 
+                  onClick={handleCancel}
+                  className="mt-6 flex items-center justify-center gap-2 mx-auto bg-white/10 hover:bg-red-500/20 text-white/80 hover:text-red-400 px-6 py-2.5 rounded-2xl border border-white/20 hover:border-red-500/50 transition-all font-bold group"
+                >
+                  <XCircle size={18} className="group-hover:animate-pulse" />
+                  取消生成
+                </button>
+             </div>
           </div>
       )}
     </div>

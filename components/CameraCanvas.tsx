@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, RefreshCw, Square, PenTool, Eraser, Sparkles, Undo2, Circle, Upload, ClipboardPaste, Crop, Check, X, CameraOff, Video, Type as TypeIcon } from 'lucide-react';
+import { Camera, RefreshCw, Square, PenTool, Eraser, Sparkles, Undo2, Circle, Upload, ClipboardPaste, Crop, Check, X, CameraOff, Video, Type as TypeIcon, Settings2, ChevronDown } from 'lucide-react';
 import { ToolType, Annotation } from '../types';
 
 interface CameraCanvasProps {
@@ -28,6 +28,27 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
   const [isTextInputOpen, setIsTextInputOpen] = useState(false);
   const [manualText, setManualText] = useState('');
 
+  // Camera selection state
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>(undefined);
+  const [isCameraListOpen, setIsCameraListOpen] = useState(false);
+
+  const handleDevices = useCallback(
+    (mediaDevices: MediaDeviceInfo[]) => {
+      const videoInputs = mediaDevices.filter(({ kind }) => kind === "videoinput");
+      setDevices(videoInputs);
+      // Initialize with the first device if none selected
+      if (videoInputs.length > 0 && !selectedDeviceId) {
+        setSelectedDeviceId(videoInputs[0].deviceId);
+      }
+    },
+    [selectedDeviceId]
+  );
+
+  useEffect(() => {
+    navigator.mediaDevices.enumerateDevices().then(handleDevices);
+  }, [handleDevices]);
+
   const handleUserMedia = useCallback((stream: MediaStream) => {
     const track = stream.getVideoTracks()[0];
     const settings = track.getSettings();
@@ -39,7 +60,6 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
   const capture = useCallback(() => {
     if (!isCameraOn) {
       setIsCameraOn(true);
-      // Wait a bit for the camera to stabilize if it was just turned on
       setTimeout(() => {
         const imageSrc = webcamRef.current?.getScreenshot();
         if (imageSrc) {
@@ -62,7 +82,7 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
   const toggleCamera = () => {
     setIsCameraOn(prev => !prev);
     if (!isCameraOn) {
-        setVideoAspectRatio(16 / 9); // Reset to default when turning on to avoid jump
+        setVideoAspectRatio(16 / 9);
     }
   };
 
@@ -186,8 +206,6 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
     const img = new Image();
     img.src = screenshot;
     img.onload = () => {
-      // Adjust internal canvas size to image aspect ratio if needed
-      // To keep standard coordinates, we'll keep a fixed internal size but draw precisely
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const hRatio = canvas.width / img.width;
       const vRatio = canvas.height / img.height;
@@ -333,12 +351,16 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
             >
               {isCameraOn ? (
                 <Webcam
+                  key={selectedDeviceId} // CRITICAL: Forces re-mount on device change
                   audio={false}
                   ref={webcamRef}
                   onUserMedia={handleUserMedia}
                   screenshotFormat="image/png"
                   className="w-full h-full object-contain"
-                  videoConstraints={{ facingMode: "environment" }}
+                  videoConstraints={{ 
+                    deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+                    facingMode: selectedDeviceId ? undefined : "environment" 
+                  }}
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-slate-800 text-slate-500 gap-4">
@@ -349,16 +371,57 @@ const CameraCanvas: React.FC<CameraCanvasProps> = ({ onProcess, onProcessText, i
                 </div>
               )}
 
-              <div className="absolute top-4 right-4 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 group-hover:bg-black/60 transition-colors shadow-lg">
-                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isCameraOn ? 'text-blue-400' : 'text-white/40'}`}>
-                  {isCameraOn ? 'Live' : 'Off'}
-                </span>
-                <button
-                  onClick={toggleCamera}
-                  className={`relative w-8 h-4 rounded-full transition-all duration-300 focus:outline-none ${isCameraOn ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-600'}`}
-                >
-                  <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 ${isCameraOn ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
+              <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+                {/* Camera Selection Dropdown */}
+                {devices.length > 1 && isCameraOn && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsCameraListOpen(!isCameraListOpen)}
+                      className="flex items-center gap-1 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 group-hover:bg-black/60 transition-colors shadow-lg text-white/80 hover:text-white"
+                    >
+                      <Settings2 size={14} />
+                      <span className="text-[10px] font-bold">切换</span>
+                      <ChevronDown size={12} className={`transition-transform duration-300 ${isCameraListOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {isCameraListOpen && (
+                      <div className="absolute top-full right-0 mt-2 w-48 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-1">
+                        <div className="p-2 border-b border-white/5 bg-white/5">
+                           <span className="text-[9px] font-bold text-white/40 uppercase tracking-wider px-2">可用摄像头</span>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto py-1">
+                          {devices.map((device) => (
+                            <button
+                              key={device.deviceId}
+                              onClick={() => {
+                                setSelectedDeviceId(device.deviceId);
+                                setIsCameraListOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-white/10 flex items-center justify-between ${
+                                selectedDeviceId === device.deviceId ? 'text-blue-400 bg-blue-500/10' : 'text-white/70'
+                              }`}
+                            >
+                              <span className="truncate pr-2">{device.label || `摄像头 ${devices.indexOf(device) + 1}`}</span>
+                              {selectedDeviceId === device.deviceId && <Check size={12} />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 group-hover:bg-black/60 transition-colors shadow-lg">
+                  <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${isCameraOn ? 'text-blue-400' : 'text-white/40'}`}>
+                    {isCameraOn ? 'Live' : 'Off'}
+                  </span>
+                  <button
+                    onClick={toggleCamera}
+                    className={`relative w-8 h-4 rounded-full transition-all duration-300 focus:outline-none ${isCameraOn ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]' : 'bg-slate-600'}`}
+                  >
+                    <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform duration-300 ${isCameraOn ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </button>
+                </div>
               </div>
 
               <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-white/20 rounded-tl-lg pointer-events-none" />

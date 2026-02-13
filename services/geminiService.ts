@@ -2,6 +2,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { LessonType } from "../types";
 
+export interface RequestOptions {
+  signal?: AbortSignal;
+}
+
 export class GeminiService {
   private customApiKey?: string;
 
@@ -53,7 +57,7 @@ export class GeminiService {
     return cleaned;
   }
 
-  async analyzeText(text: string, age: number): Promise<string[]> {
+  async analyzeText(text: string, age: number, options?: RequestOptions): Promise<string[]> {
     const response = await this.ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `你是一位严谨的学科知识架构师。针对以下文本内容，请为 ${age} 岁的学习者提取其中的专业核心知识点。
@@ -71,7 +75,8 @@ export class GeminiService {
           type: Type.ARRAY,
           items: { type: Type.STRING }
         }
-      }
+      },
+      requestOptions: options
     });
 
     try {
@@ -81,7 +86,7 @@ export class GeminiService {
     }
   }
 
-  async analyzeImage(base64Image: string, age: number): Promise<string[]> {
+  async analyzeImage(base64Image: string, age: number, options?: RequestOptions): Promise<string[]> {
     const response = await this.ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
@@ -107,7 +112,8 @@ export class GeminiService {
           type: Type.ARRAY,
           items: { type: Type.STRING }
         }
-      }
+      },
+      requestOptions: options
     });
 
     try {
@@ -117,7 +123,7 @@ export class GeminiService {
     }
   }
 
-  async subdivideTopics(topics: string[], age: number): Promise<string[]> {
+  async subdivideTopics(topics: string[], age: number, options?: RequestOptions): Promise<string[]> {
     const response = await this.ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `针对知识点：'${topics.join(', ')}'，进行单层深度的学科逻辑拆解。仅输出紧邻的、必须掌握的先验知识。
@@ -129,7 +135,8 @@ export class GeminiService {
           type: Type.ARRAY,
           items: { type: Type.STRING }
         }
-      }
+      },
+      requestOptions: options
     });
 
     try {
@@ -139,7 +146,7 @@ export class GeminiService {
     }
   }
 
-  async generateLesson(topics: string[], age: number, type: LessonType, isProMode: boolean, extraRequirements?: string): Promise<string> {
+  async generateLesson(topics: string[], age: number, type: LessonType, isProMode: boolean, extraRequirements?: string, options?: RequestOptions): Promise<string> {
     const userInstruction = extraRequirements ? `\n**个性化补充要求：**\n${extraRequirements}\n` : "";
 
     const pedagogyPhilosophy = `
@@ -163,14 +170,17 @@ export class GeminiService {
             text: `创作一张关于 "${topics.join(', ')}" 的专业教学插图。要求：结构精确，学科逻辑清晰，绘图风格严谨且高质，适合 ${age} 岁教育场景。${userInstruction}`
           }]
         },
-        config: { imageConfig }
+        config: { imageConfig },
+        requestOptions: options
       });
 
       let imageUrl = '';
-      for (const part of imageResponse.candidates[0].content.parts) {
-        if (part.inlineData) {
-          imageUrl = `data:image/png;base64,${part.inlineData.data}`;
-          break;
+      if (imageResponse.candidates && imageResponse.candidates[0]) {
+        for (const part of imageResponse.candidates[0].content.parts) {
+          if (part.inlineData) {
+            imageUrl = `data:image/png;base64,${part.inlineData.data}`;
+            break;
+          }
         }
       }
 
@@ -187,7 +197,8 @@ export class GeminiService {
         
         **代码交付：**
         仅输出纯 HTML 代码，包含 CSS 和 JS，不要 Markdown 包裹。`,
-        config: { thinkingConfig: { thinkingBudget: isProMode ? 8000 : 4000 } }
+        config: { thinkingConfig: { thinkingBudget: isProMode ? 8000 : 4000 } },
+        requestOptions: options
       });
 
       const rawHtml = this.cleanResponse(htmlResponse.text || "");
@@ -215,7 +226,8 @@ export class GeminiService {
       - 背景色专业、沉稳。`,
       config: {
         thinkingConfig: { thinkingBudget: isProMode ? 8000 : 4000 }
-      }
+      },
+      requestOptions: options
     });
 
     return this.cleanResponse(response.text || "<div>生成失败，请重试。</div>");
